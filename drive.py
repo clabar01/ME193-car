@@ -3,9 +3,11 @@ import cv2
 
 import gestures
 import motor
+from crash_guard import CrashGuard
 from motor import CarMotor
 
 CARD_SERIAL = "0999"
+COLOR_CARD_SERIAL = None  # first advertising color sensor - fine with only one powered on
 MODEL = "gesture_recognizer.task"
 
 speed = 60
@@ -29,6 +31,9 @@ gestures.load_classifier()
 
 car = CarMotor(CARD_SERIAL)
 car.connect()
+
+crash_guard = CrashGuard(COLOR_CARD_SERIAL)
+crash_guard.connect()
 
 candidate, streak, command = "STOP", 0, "STOP"
 last_seen = time.time()
@@ -74,8 +79,15 @@ try:
         if now - last_seen > LOST_TIMEOUT:
             command = "STOP"
 
+        crashed = crash_guard.update()
+        if crashed and command in ("FORWARD", "LEFT", "RIGHT"):
+            command = "STOP"
+
         cv2.putText(frame, command, (20, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 255, 0), 3)
+        if crashed:
+            cv2.putText(frame, "WALL - BACK UP", (20, 225),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
         cv2.putText(frame, f"SPEED {speed}", (20, 105),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
         cv2.putText(frame, f"L: {hands.get('Left', '-')}", (20, 145),
@@ -99,6 +111,7 @@ try:
 finally:
     car.stop()
     car.disconnect()
+    crash_guard.disconnect()
     cap.release()
     cv2.destroyAllWindows()
     print("Stopped.")

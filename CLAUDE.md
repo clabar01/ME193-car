@@ -12,8 +12,10 @@ Webcam gestures (MediaPipe) → drive commands → LEGO Education Double Motor o
   fine when only one is powered on, ambiguous if several are.
 - **LEGO Education Single Motor**, Connection Card `1142` (`spin_motor.py`) — used
   for standalone motor tests, not part of the car itself.
-- Also supported by `lelib.py` but not currently wired into the car: **Controller**
-  (twin joysticks) and **Color Sensor**.
+- **LEGO Education Color Sensor** — now wired into the car as crash protection
+  (`crash_guard.py`, connected with `card_serial=None` like `test_devices.py`).
+  Mount it facing forward/down. Also supported by `lelib.py` but not currently
+  wired into the car: **Controller** (twin joysticks).
 - Any Mac/PC webcam (`drive.py` and `track_hands.py` both prompt for a camera index
   at startup after probing indices 0–1 with `cv2.VideoCapture`).
 - The two motors are mounted **mirrored** on the chassis — see "Signed speed = the
@@ -35,6 +37,7 @@ Webcam gestures (MediaPipe) → drive commands → LEGO Education Double Motor o
 | File | Role |
 |---|---|
 | `drive.py` | **The car.** Gesture → command → BLE motor speeds. |
+| `crash_guard.py` | Color-sensor crash protection, imported by `drive.py`. See below. |
 | `lelib.py` | Shared thin wrapper around `legoeducation`, imported by every other script. |
 | `track_hands.py` | Earlier/alternate prototype: pose landmarker tracks wrist height directly to tank-drive speeds (no gesture vocabulary, no debounce). Not used by `drive.py`; kept as reference, not wired to the motor. |
 | `scan.py` | `bleak` BLE scan to list advertising LEGO devices by name/address — use when a device won't connect and you need to confirm it's advertising at all. |
@@ -104,3 +107,24 @@ Webcam gestures (MediaPipe) → drive commands → LEGO Education Double Motor o
   anything changed** — the actual BLE throttling happens after, at the
   `last_send`/`last_cmd` check (see BLE quirks above). Keeping the mapping pure and
   side-effect-free is what makes that later dedup check possible.
+
+## Crash protection (`crash_guard.py`)
+
+- **Color change is the proximity cue, not a distance reading.** There's no
+  distance sensor on this hub, so `CrashGuard` uses the Color Sensor's
+  `detect_color()` instead: it averages the first `BASELINE_FRAMES` (15) readings
+  into a baseline (the floor color), then treats any later reading that differs
+  from that baseline as "too close to a wall/object." Debounced the same way as
+  gestures — `CRASH_HOLD_FRAMES` (3) consecutive frames of the new state before
+  `active` flips — so one noisy reading at a seam or shadow doesn't trip it.
+- **Blocks forward motion only, never backward.** `drive.py` calls
+  `crash_guard.update()` every frame, right after the `LOST_TIMEOUT` check, and
+  forces `command` to `STOP` only when it's `FORWARD`/`LEFT`/`RIGHT` and the guard
+  is `active`. `BACKWARD` and `STOP` are left untouched, so the driver can always
+  back off whatever tripped it. Once the sensor sees the baseline color again
+  (the car has backed clear), `active` drops back to `False` on its own and
+  forward driving is re-enabled — there's no separate "reset" step.
+- **Baseline is captured once, at startup, not re-averaged later.** If the car
+  starts already facing a wall, that wall color becomes the baseline and the
+  guard won't catch it. Point the sensor at open floor before/while the first
+  ~15 frames come in.
