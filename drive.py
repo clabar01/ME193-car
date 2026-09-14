@@ -24,6 +24,8 @@ print("Available cameras:", cams)
 cap = cv2.VideoCapture(int(input("Which camera index? ")))
 
 recognizer = gestures.create_recognizer(MODEL)
+print(f"Loading gesture classifier {gestures.GESTURE_MODEL_PATH}...")
+gestures.load_classifier()
 
 car = CarMotor(CARD_SERIAL)
 car.connect()
