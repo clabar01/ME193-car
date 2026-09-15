@@ -7,6 +7,8 @@ over Bluetooth Low Energy.
 ## Hardware
 
 - LEGO Education Double Motor (Connection Card serial `0999`)
+- LEGO Education Color Sensor (crash protection - connects to the first
+  advertising one, no Connection Card needed if only one is powered on)
 - Any Mac or PC webcam
 
 ## Setup
@@ -45,3 +47,11 @@ Pick a camera index when prompted. Press `q` in the video window to quit.
 An unrecognized gesture holds the last command rather than stopping, so the
 car keeps driving through the moment your hands change shape. If no hands are
 visible for 1.5 seconds, the motors cut as a failsafe.
+
+## Crash protection
+
+A color sensor mounted facing forward/down watches for a color change (floor
+color vs. wall/object color) as a stand-in for a proximity sensor. When it
+trips, `FORWARD`/`LEFT`/`RIGHT` are forced to `STOP`, but `BACKWARD` still
+works normally so you can back away from whatever tripped it - once the
+sensor sees the floor color again, forward driving is re-enabled.
